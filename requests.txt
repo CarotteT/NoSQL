@@ -1,0 +1,265 @@
+1.
+db.films.aggregate([{$group: {_id: "$year", total_films: {$sum: 1}}}, {$sort: {total_films: -1}}, {$limit: 1}])
+
+2.
+db.films.aggregate([{$match: {"year": {$gt: 1999}}}, {$count: "total_films_after_1999"}])
+
+3.
+db.films.aggregate([{$match: {"year": 2007}}, {$group: {_id: null, avg_votes: {$avg: "$Votes"}}}])
+
+4.
+db.films.aggregate([{$group: {_id: "$year", count: {$sum: 1}}}, {$sort: {_id: 1}}])
+
+5.
+db.films.aggregate([{"$project": {"genre": {"$split": ["$genre", ","]}}}, {$unwind: "$genre"}, {$group: {_id: "$genre"}}])
+
+6.
+db.films.aggregate([{$match: {"Revenue (Millions)": {$ne: ""}}}, {$sort: {"Revenue (Millions)": -1}}, {$limit: 1}])
+
+7.
+db.films.aggregate([{$group: {_id: "$Director", number_of_films: {$sum: 1}}}, {$match: {number_of_films: {$gt: 5}}}]) 
+
+db.films.aggregate([{$group: {_id: "$Director", number_of_films: {$sum: 1}}}, {$match: {number_of_films: {$gt: 2}}}]) 
+
+8.
+db.films.aggregate([{$match: {"Revenue (Millions)": {$ne: ""}}}, 
+{$project: {"genre": {$split: ["$genre", ","]}, revenue: {$toDouble: "$Revenue (Millions)"}}}, 
+{$unwind: "$genre"}, 
+{$group: {_id: "$genre", avg_revenue: {$avg: "$revenue"}}}, 
+{$sort: {avg_revenue: -1}}, {$limit: 1}])
+
+9.
+db.films.aggregate([{$match: {"rating": {$ne: ""}}}, 
+  {$addFields: {decade: {$subtract: [{$toInt: "$year"}, {$mod: [{$toInt: "$year"}, 10]}]}}}, 
+  {$sort: {"decade": 1, "rating": -1}},  
+  {$group: { _id: "$decade", top_movies: {$push: {title: "$title", rating: "$rating"}}}}, 
+  {$project: { _id: 1, top_movies: {$slice: ["$top_movies", 3]}}}, 
+  {$sort: { _id: 1}}]) 
+
+db.films.aggregate([{$match: {"Metascore": {$ne: ""}}}, 
+  {$addFields: {decade: {$subtract: [{$toInt: "$year"}, {$mod: [{$toInt: "$year"}, 10]}]}}},  
+  {$addFields: {Metascore: {$toInt: "$Metascore"}}},  
+  {$sort: {"decade": 1, "Metascore": -1}},  
+  {$group: {_id: "$decade", top_movies: {$push: {title: "$title", Metascore: "$Metascore"}}}}, 
+  {$project: { _id: 1, top_movies: {$slice: ["$top_movies", 3]}}},  
+  {$sort: { _id: 1}}]) 
+
+10.
+db.films.aggregate([{$match: {"Runtime (Minutes)": {$ne: ""}}}, 
+  	{$project: {"genre": {$split: ["$genre", ","]}, "title": 1, "runtime": {$toInt: "$Runtime (Minutes)"}}}, 
+  	{$unwind: "$genre"},
+  	{$sort: {"runtime": -1}}, 
+ 	{$group: {_id: "$genre", longest_film: {$first: {title: "$title", Runtime: "$runtime"}}}}])
+
+11.
+db.createView("top_movies", "films",
+                [{$match: {"Metascore": {$ne: "", $gt: 80}, "Revenue (Millions)": {$ne: "", $gt: 50}}}, 
+                 {$project: {"title": 1, "year": 1, Metascore: {$toInt: "$Metascore"}, revenue: {$toDouble: "$Revenue (Millions)"}}}]) 
+
+12.
+db.films.aggregate([{$match: {"Runtime (Minutes)": {$ne: ""}, "Revenue (Millions)": {$ne: ""}}},
+                    {$project: {"title": 1, runtime: {$toInt: "$Runtime (Minutes)"}, revenue: {$toDouble: "$Revenue (Millions)"}}}])
+
+13.
+db.films.aggregate([
+  {$match: {"Runtime (Minutes)": {$ne: ""}, "year": {$ne: ""}}},
+  {$project: {decade: {$subtract: [{$toInt: "$year"}, {$mod: [{$toInt: "$year"}, 10]}]}, runtime: {$toInt: "$Runtime (Minutes)"}}},
+  {$group: {_id: "$decade", avg_runtime: {$avg: "$runtime"}}},
+  {$sort: {_id: 1}}])
+
+#------------------------------------------------------------------------------------------
+
+LOAD CSV WITH HEADERS FROM 'https://drive.google.com/uc?export=download&id=14iNjLLjCtF1nht3btyW_E692t_A18CIC' AS row
+CREATE (:Film {
+    id: row._id,
+    title: row.title,
+    year: toInteger(row.year),
+    votes: toInteger(row.Votes),
+    revenue: toFloat(row.`Revenue (Millions)`),
+    rating: row.rating,
+    director: row.Director,
+    metascore: row.Metascore
+});
+
+LOAD CSV WITH HEADERS FROM 'https://drive.google.com/uc?export=download&id=14iNjLLjCtF1nht3btyW_E692t_A18CIC' AS row
+WITH row
+WHERE row.Director IS NOT NULL AND trim(row.Director) <> "" 
+MERGE (d:Director {name: row.Director})
+
+LOAD CSV WITH HEADERS FROM 'https://drive.google.com/uc?export=download&id=14iNjLLjCtF1nht3btyW_E692t_A18CIC' AS row
+WITH row, split(row.Actors, ',') AS actors 
+UNWIND actors AS actorName
+WITH distinct trim(actorName) AS actorName, row._id AS filmId
+WHERE actorName IS NOT NULL AND trim(actorName) <> "" 
+MERGE (a:Actor {name: trim(actorName)})
+
+LOAD CSV WITH HEADERS FROM 'https://drive.google.com/uc?export=download&id=14iNjLLjCtF1nht3btyW_E692t_A18CIC' AS row
+WITH row
+WHERE row.Actors IS NOT NULL AND trim(row.Actors) <> "" 
+UNWIND split(row.Actors, ',') AS actorName 
+WITH DISTINCT trim(actorName) AS actorName, row 
+MERGE (a:Actor {name: actorName}) 
+WITH a, row
+MATCH (f:Film {id: row._id}) 
+MERGE (a)-[:A_JOUE]->(f); 
+
+LOAD CSV WITH HEADERS FROM 'https://drive.google.com/uc?export=download&id=14iNjLLjCtF1nht3btyW_E692t_A18CIC' AS row
+WITH row
+WHERE row.Director IS NOT NULL AND trim(row.Director) <> ""
+MERGE (d:Director {name: row.Director})
+WITH d, row
+MATCH (f:Film {id: row._id}) 
+MERGE (d)-[:A_REALISE]->(f);
+
+LOAD CSV WITH HEADERS FROM 'https://drive.google.com/uc?export=download&id=14iNjLLjCtF1nht3btyW_E692t_A18CIC' AS row
+WITH row, split(row.genre, ',') AS genres
+UNWIND genres AS genre
+WITH DISTINCT trim(genre) AS genre
+WHERE genre IS NOT NULL AND genre <> ""
+MERGE (g:Genre {name: genre});
+
+LOAD CSV WITH HEADERS FROM 'https://drive.google.com/uc?export=download&id=14iNjLLjCtF1nht3btyW_E692t_A18CIC' AS row
+WITH row, split(row.genre, ',') AS genres
+UNWIND genres AS genre
+WITH DISTINCT trim(genre) AS genre, row
+WHERE genre IS NOT NULL AND genre <> ""
+MATCH (f:Film {id: row._id})
+MERGE (g:Genre {name: genre})
+MERGE (f)-[:A_POUR_GENRE]->(g);
+
+14.
+MATCH (a:Actor)-[:A_JOUE]->(f:Film)
+WITH a, COUNT(f) AS filmCount
+ORDER BY filmCount DESC
+(LIMIT 1)
+RETURN a.name AS Actor, filmCount AS NumberOfFilms;
+
+15.
+MATCH (a1:Actor)-[:A_JOUE]->(f:Film)<-[:A_JOUE]-(a2:Actor)
+WHERE a1.name = 'Anne Hathaway' AND a1 <> a2
+RETURN DISTINCT a2.name AS Actor, f.title AS Film;
+
+16.
+MATCH (a:Actor)-[:A_JOUE]->(f:Film)
+WHERE f.revenue IS NOT NULL  
+WITH a, COLLECT(f.title) AS film_titles, COUNT(f) AS films_count, SUM(f.revenue) AS total_revenue
+ORDER BY total_revenue DESC
+RETURN a.name AS Actor, films_count AS NumberOfFilms, film_titles AS FilmTitles, total_revenue AS TotalRevenue;
+
+17.
+MATCH (f:Film)
+WHERE f.votes IS NOT NULL
+RETURN AVG(f.votes) AS AverageVotes;
+
+18.
+MATCH (f:Film)-[:A_POUR_GENRE]->(g:Genre)
+RETURN g.name AS Genre, COUNT(f) AS NumberOfFilms
+ORDER BY NumberOfFilms DESC
+LIMIT 1;
+
+19.
+MERGE (a:Actor {name: "Emeline Pellan"})
+MERGE (f:Film {title: "Interstellar"})
+MERGE (a)-[:A_JOUE]->(f);
+
+MATCH (a1:Actor {name: "Emeline Pellan"})-[:A_JOUE]->(f1:Film)<-[:A_JOUE]-(a2:Actor),
+      (a2)-[:A_JOUE]->(f2:Film)
+WHERE f2 <> f1  
+RETURN DISTINCT a2.name AS Actor, f2.title AS FilmTitle;
+
+20.
+MATCH (d:Director)-[:A_REALISE]->(f:Film)<-[:A_JOUE]-(a:Actor)
+WITH d, COUNT(DISTINCT a) AS num_actors
+ORDER BY num_actors DESC
+LIMIT 1
+RETURN d.name AS Director, num_actors AS NumberOfActors;
+
+21.
+MATCH (f1:Film)<-[:A_JOUE]-(a:Actor)-[:A_JOUE]->(f2:Film)
+WHERE f1 <> f2 AND f1.title < f2.title
+WITH f1, f2, COLLECT(DISTINCT a.name) AS shared_actors_names, COUNT(DISTINCT a) AS common_actors
+ORDER BY common_actors DESC
+LIMIT 5
+RETURN f1.title AS Film1, f2.title AS Film2, common_actors AS NumberOfSharedActors, shared_actors_names AS SharedActorsNames;
+
+22.
+MATCH (a:Actor)-[:A_JOUE]->(f:Film)<-[:A_REALISE]-(d:Director)
+WITH a, COUNT(DISTINCT d) AS num_directors
+ORDER BY num_directors DESC
+LIMIT 5
+RETURN a.name AS Actor, num_directors AS NumberOfDirectors;
+
+23.
+MATCH (a:Actor {name: "Anne Hathaway"})-[:A_JOUE]->(f:Film)-[:A_POUR_GENRE]->(g:Genre)
+MATCH (r:Film)-[:A_POUR_GENRE]->(g)
+WHERE NOT (a)-[:A_JOUE]->(r) 
+RETURN DISTINCT r.title AS RecommendedFilm, COLLECT(DISTINCT g.name) AS Genres
+ORDER BY SIZE(COLLECT(DISTINCT g.name)) DESC
+LIMIT 1;
+
+24.
+MATCH (d1:Director)-[:A_REALISE]->(f1:Film)-[:A_POUR_GENRE]->(g1:Genre)
+WITH d1, COLLECT(DISTINCT g1.name) AS genres_d1
+MATCH (d2:Director)-[:A_REALISE]->(f2:Film)-[:A_POUR_GENRE]->(g2:Genre)
+WHERE d1 <> d2
+WITH d1, d2, genres_d1, COLLECT(DISTINCT g2.name) AS genres_d2
+WHERE size(apoc.coll.intersection(genres_d1, genres_d2)) > 2  
+MERGE (d1)-[:INFLUENCE_PAR]->(d2)
+MERGE (d2)-[:INFLUENCE_PAR]->(d1);
+
+25.
+MATCH (a1:Actor {name: "Tom Hanks"}), (a2:Actor {name: "Scarlett Johansson"})
+MATCH path = shortestPath((a1)-[:A_JOUE*]-(a2))
+RETURN path;
+
+26.
+MATCH (a1:Actor)-[:A_JOUE]->(f:Film)<-[:A_JOUE]-(a2:Actor)
+WHERE a1 <> a2 AND a1.name < a2.name
+WITH a1, a2, COUNT(f) AS common_movies, COLLECT(f.title) AS common_movies_titles
+WHERE common_movies > 1
+RETURN a1.name AS Actor1, a2.name AS Actor2, common_movies AS CommonMovies, common_movies_titles AS CommonMoviesTitle;
+
+27.
+MATCH (f1:Film)-[:A_POUR_GENRE]->(g:Genre)<-[:A_POUR_GENRE]-(f2:Film)
+MATCH (f1)<-[:A_REALISE]-(d1:Director), (f2)<-[:A_REALISE]-(d2:Director)
+WHERE f1 <> f2 AND d1 <> d2
+WITH f1, d1, f2, d2, COLLECT(DISTINCT g.name) AS shared_genres
+WHERE size(shared_genres) >= 2
+RETURN f1.title AS Film1, d1.name AS Director1, 
+       f2.title AS Film2, d2.name AS Director2, 
+       shared_genres
+ORDER BY size(shared_genres) DESC
+LIMIT 10;
+
+28.
+MATCH (a:Actor {name: "Anne Hathaway"})-[:A_JOUE]->(f:Film)-[:A_POUR_GENRE]->(g:Genre)
+WITH a, COLLECT(DISTINCT g) AS anne_genres
+MATCH (r:Film)-[:A_POUR_GENRE]->(g:Genre) 
+WHERE g IN anne_genres 
+WITH r, COLLECT(DISTINCT g.name) AS genre_overlap
+WHERE size(genre_overlap) >= 2
+ORDER BY genre_overlap DESC 
+LIMIT 10
+RETURN r.title AS RecommendedMovie, genre_overlap AS MatchingGenres;
+
+29.
+MATCH (d1:Director)-[:A_REALISE]->(f1:Film)-[:A_POUR_GENRE]->(g:Genre),
+      (d2:Director)-[:A_REALISE]->(f2:Film)-[:A_POUR_GENRE]->(g:Genre)
+WHERE d1 <> d2 
+AND f1.year = f2.year 
+WITH d1, d2, f1.year AS year, f1, f2, COUNT(DISTINCT g) AS num_genres
+WHERE num_genres >= 2 
+MERGE (d1)-[:CONCURRENCE {shared_genres: num_genres, year: year}]->(d2)
+MERGE (d3)-[:CONCURRENCE {shared_genres: num_genres, year: year}]->(d1);
+
+30.
+MATCH (d:Director)-[:A_REALISE]->(f:Film)<-[:A_JOUE]-(a:Actor)
+WHERE f.revenue IS NOT NULL AND f.metascore IS NOT NULL
+WITH d, a, COUNT(f) AS common_films, AVG(f.revenue) AS avg_revenue, AVG(f.metascore) AS avg_metascore
+WHERE common_films >= 2
+RETURN d.name AS Director, 
+       a.name AS Actor, 
+       common_films AS NumberOfFilmsTogether, 
+       avg_revenue AS AvgRevenue, 
+       avg_metascore AS AvgMetascore
+ORDER BY common_films DESC, avg_revenue DESC;
