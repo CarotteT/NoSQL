@@ -59,7 +59,7 @@ NoSQL_Project/
 - Interface intuitive permettant d'exécuter les requêtes dynamiquement.
 - Visualisation des résultats sous forme de tableaux et graphiques interactifs.
 
-## 📖 Références
+## Références
 - [Documentation MongoDB](https://www.mongodb.com/docs/)
 - [Documentation Neo4j](https://neo4j.com/docs/)
 - [Documentation Streamlit](https://docs.streamlit.io/)
