@@ -10,6 +10,7 @@ Ce projet vise à explorer deux types de bases de données NoSQL : **MongoDB** (
 - Réaliser des analyses statistiques et des visualisations des données obtenues.
 
 ## Configuration et mise en place
+Télécharge tous les fichiers du dossier /app.
 
 ### 1. Environnement virtuel
 Création d'un environnement virtuel pour une bonne gestion des dépendances :
