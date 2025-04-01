@@ -33,6 +33,18 @@ streamlit run app_streamlit.py
 ```
 Cette commande ouvrira une interface web interactive où tu pourras exécuter les requêtes et visualiser les résultats.
 
+### 📥 Télécharger l'environnement prêt à l'emploi
+Si tu veux éviter la configuration manuelle, tu peux télécharger le **.zip** contenant l'environnement virtuel préconfiguré :
+1. Télécharge l'archive ici : (https://github.com/CarotteT/NoSQL/releases)
+2. Décompresse l'archive.
+3. Active l'environnement avec :
+   ```bash
+   source .venv/bin/activate  # macOS/Linux
+   # ou
+   .venv\Scripts\activate  # Windows
+   ```
+4. Lance l'application normalement avec `streamlit run app_streamlit.py`.
+
 ## Structure du projet
 ```
 NoSQL_Project/
