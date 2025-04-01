@@ -35,7 +35,7 @@ Cette commande ouvrira une interface web interactive où tu pourras exécuter le
 
 ### 📥 Télécharger l'environnement prêt à l'emploi
 Si tu veux éviter la configuration manuelle, tu peux télécharger le **.zip** contenant l'environnement virtuel préconfiguré :
-1. Télécharge l'archive ici : (https://github.com/CarotteT/NoSQL/releases)
+1. Télécharge l'archive ici : [(https://github.com/CarotteT/NoSQL/releases)](https://github.com/CarotteT/NoSQL)
 2. Décompresse l'archive.
 3. Active l'environnement avec :
    ```bash
